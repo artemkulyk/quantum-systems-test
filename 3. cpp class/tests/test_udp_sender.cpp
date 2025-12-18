@@ -7,9 +7,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <cassert>
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -17,25 +17,30 @@
 
 namespace {
 
+[[noreturn]] void die(const char* expr, const char* file, int line) {
+  std::cerr << "CHECK failed: " << expr << " at " << file << ":" << line << "\n";
+  std::abort();
+}
+
+#define CHECK(expr) do { if (!(expr)) die(#expr, __FILE__, __LINE__); } while (0)
+
 /**
  * Create an IPv4 UDP socket bound to 127.0.0.1:0 (ephemeral port).
  * Returns fd and writes chosen port into out_port.
  */
 int make_server_socket_v4(uint16_t& out_port) {
   int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
-  assert(fd >= 0);
+  CHECK(fd >= 0);
 
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = htons(0);
 
-  int rc = ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-  assert(rc == 0);
+  CHECK(::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0);
 
   socklen_t len = sizeof(addr);
-  rc = ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
-  assert(rc == 0);
+  CHECK(::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) == 0);
 
   out_port = ntohs(addr.sin_port);
   return fd;
@@ -119,14 +124,12 @@ static void test_send_now_v4() {
   const std::string msg = "hello-v4";
 
   int err = -1;
-  bool ok = sender.send_now("127.0.0.1", port, msg.data(), msg.size(), &err);
-  assert(ok);
-  assert(err == 0);
+  CHECK(sender.send_now("127.0.0.1", port, msg.data(), msg.size(), &err));
+  CHECK(err == 0);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 500);
-  assert(r);
-  assert(std::string(got.begin(), got.end()) == msg);
+  CHECK(recv_with_timeout(srv, got, 500));
+  CHECK(std::string(got.begin(), got.end()) == msg);
 
   ::close(srv);
 }
@@ -139,14 +142,12 @@ static void test_send_now_vector_overload_v4() {
   std::vector<uint8_t> payload{'v','e','c','t','o','r'};
 
   int err = -1;
-  bool ok = sender.send_now("127.0.0.1", port, payload, &err);
-  assert(ok);
-  assert(err == 0);
+  CHECK(sender.send_now("127.0.0.1", port, payload, &err));
+  CHECK(err == 0);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 500);
-  assert(r);
-  assert(got == payload);
+  CHECK(recv_with_timeout(srv, got, 500));
+  CHECK(got == payload);
 
   ::close(srv);
 }
@@ -160,14 +161,12 @@ static void test_send_now_v6_if_available() {
   const std::string msg = "hello-v6";
 
   int err = -1;
-  bool ok = sender.send_now("::1", port, msg.data(), msg.size(), &err);
-  assert(ok);
-  assert(err == 0);
+  CHECK(sender.send_now("::1", port, msg.data(), msg.size(), &err));
+  CHECK(err == 0);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 500);
-  assert(r);
-  assert(std::string(got.begin(), got.end()) == msg);
+  CHECK(recv_with_timeout(srv, got, 500));
+  CHECK(std::string(got.begin(), got.end()) == msg);
 
   ::close(srv);
 }
@@ -185,16 +184,15 @@ static void test_send_after() {
   sender.send_after(1, "127.0.0.1", port, payload);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 2500);
-  assert(r);
+  CHECK(recv_with_timeout(srv, got, 2500));
   auto t1 = clock::now();
 
-  assert(got == payload);
+  CHECK(got == payload);
 
   auto elapsed_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
-  assert(elapsed_ms >= 800);
-  assert(elapsed_ms <= 2200);
+  CHECK(elapsed_ms >= 800);
+  CHECK(elapsed_ms <= 2200);
 
   ::close(srv);
 }
@@ -211,19 +209,15 @@ static void test_send_every_and_cancel() {
   int count = 0;
   for (int i = 0; i < 3; ++i) {
     std::vector<uint8_t> got;
-    if (recv_with_timeout(srv, got, 2500)) {
-      if (got == payload) count++;
-    }
+    if (recv_with_timeout(srv, got, 2500) && got == payload) count++;
     if (count >= 2) break;
   }
-  assert(count >= 2);
+  CHECK(count >= 2);
 
-  bool canceled = sender.cancel(id);
-  assert(canceled);
+  CHECK(sender.cancel(id));
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 1500);
-  assert(!r);
+  CHECK(!recv_with_timeout(srv, got, 1500));
 
   ::close(srv);
 }
@@ -233,9 +227,8 @@ static void test_send_now_invalid_ip_sets_errno() {
   const std::string msg = "x";
 
   int err = 0;
-  bool ok = sender.send_now("not-an-ip", 12345, msg.data(), msg.size(), &err);
-  assert(!ok);
-  assert(err == EINVAL);
+  CHECK(!sender.send_now("not-an-ip", 12345, msg.data(), msg.size(), &err));
+  CHECK(err == EINVAL);
 }
 
 static void test_send_now_unreachable_sets_errno() {
@@ -244,9 +237,7 @@ static void test_send_now_unreachable_sets_errno() {
 
   int err = 0;
   bool ok = sender.send_now("203.0.113.1", 9, msg.data(), msg.size(), &err);
-  if (!ok) {
-    assert(err != 0);
-  }
+  if (!ok) CHECK(err != 0);
 }
 
 // ---- edge-case tests ----
@@ -258,18 +249,17 @@ static void test_invalid_seconds_throw() {
   bool threw0 = false;
   try { (void)sender.send_after(0, "127.0.0.1", 12345, payload); }
   catch (const std::invalid_argument&) { threw0 = true; }
-  assert(threw0);
+  CHECK(threw0);
 
   bool threw0b = false;
   try { (void)sender.send_every(0, "127.0.0.1", 12345, payload); }
   catch (const std::invalid_argument&) { threw0b = true; }
-  assert(threw0b);
+  CHECK(threw0b);
 }
 
 static void test_cancel_unknown_id_returns_false() {
   udp_sender::UdpSender sender;
-  bool ok = sender.cancel(999999999ULL);
-  assert(!ok);
+  CHECK(!sender.cancel(999999999ULL));
 }
 
 static void test_cancel_one_shot_before_due() {
@@ -280,12 +270,10 @@ static void test_cancel_one_shot_before_due() {
   std::vector<uint8_t> payload{'n','o'};
 
   auto id = sender.send_after(1, "127.0.0.1", port, payload);
-  bool canceled = sender.cancel(id);
-  assert(canceled);
+  CHECK(sender.cancel(id));
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 1600);
-  assert(!r);
+  CHECK(!recv_with_timeout(srv, got, 1600));
 
   ::close(srv);
 }
@@ -307,7 +295,7 @@ static void test_cancel_one_shot_after_due_race_no_extra_send() {
     std::vector<uint8_t> got;
     if (recv_with_timeout(srv, got, 1200) && got == payload) received++;
   }
-  assert(received <= 1);
+  CHECK(received <= 1);
 
   ::close(srv);
 }
@@ -327,13 +315,12 @@ static void test_multiple_tasks_same_tick_both_deliver() {
   int got_b = 0;
   for (int i = 0; i < 2; ++i) {
     std::vector<uint8_t> got;
-    bool r = recv_with_timeout(srv, got, 2500);
-    assert(r);
+    CHECK(recv_with_timeout(srv, got, 2500));
     if (got == a) got_a++;
     if (got == b) got_b++;
   }
-  assert(got_a == 1);
-  assert(got_b == 1);
+  CHECK(got_a == 1);
+  CHECK(got_b == 1);
 
   ::close(srv);
 }
@@ -348,15 +335,14 @@ static void test_periodic_cancel_immediate_stop() {
   auto id = sender.send_every(1, "127.0.0.1", port, payload);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 2500);
-  assert(r && got == payload);
+  CHECK(recv_with_timeout(srv, got, 2500));
+  CHECK(got == payload);
 
-  assert(sender.cancel(id));
+  CHECK(sender.cancel(id));
   drain_for(srv, 2100);
 
   got.clear();
-  bool r2 = recv_with_timeout(srv, got, 200);
-  assert(!r2);
+  CHECK(!recv_with_timeout(srv, got, 200));
 
   ::close(srv);
 }
@@ -369,11 +355,10 @@ static void test_periodic_cancel_before_first_send() {
   std::vector<uint8_t> payload{'z'};
 
   auto id = sender.send_every(1, "127.0.0.1", port, payload);
-  assert(sender.cancel(id));
+  CHECK(sender.cancel(id));
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 1600);
-  assert(!r);
+  CHECK(!recv_with_timeout(srv, got, 1600));
 
   ::close(srv);
 }
@@ -404,14 +389,12 @@ static void test_send_now_errno_is_overwritten_on_success() {
   const std::string msg = "ok";
 
   int err = 12345;
-  bool ok = sender.send_now("127.0.0.1", port, msg.data(), msg.size(), &err);
-  assert(ok);
-  assert(err == 0);
+  CHECK(sender.send_now("127.0.0.1", port, msg.data(), msg.size(), &err));
+  CHECK(err == 0);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 500);
-  assert(r);
-  assert(std::string(got.begin(), got.end()) == msg);
+  CHECK(recv_with_timeout(srv, got, 500));
+  CHECK(std::string(got.begin(), got.end()) == msg);
 
   ::close(srv);
 }
@@ -428,23 +411,17 @@ static void test_long_delay_not_early() {
   sender.send_after(1, "127.0.0.1", port, shortp);
 
   std::vector<uint8_t> got;
-  bool r1 = recv_with_timeout(srv, got, 2500);
-  assert(r1);
-  assert(got == shortp);
+  CHECK(recv_with_timeout(srv, got, 2500));
+  CHECK(got == shortp);
 
   got.clear();
-  bool r2 = recv_with_timeout(srv, got, 3000);
-  assert(!r2);
+  CHECK(!recv_with_timeout(srv, got, 3000));
 
   ::close(srv);
 }
 
 // ---- error callback tests ----
 
-/**
- * Simple recorder passed to the error callback.
- * Uses atomics because callback runs from the worker thread.
- */
 struct ErrRec {
   std::atomic<int> calls{0};
   std::atomic<int> last_err{0};
@@ -470,12 +447,11 @@ static void test_error_callback_not_called_on_success_send_after() {
   sender.send_after(1, "127.0.0.1", port, payload);
 
   std::vector<uint8_t> got;
-  bool r = recv_with_timeout(srv, got, 2500);
-  assert(r);
-  assert(got == payload);
+  CHECK(recv_with_timeout(srv, got, 2500));
+  CHECK(got == payload);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  assert(rec.calls.load(std::memory_order_relaxed) == 0);
+  CHECK(rec.calls.load(std::memory_order_relaxed) == 0);
 
   ::close(srv);
 }
@@ -494,15 +470,11 @@ static void test_error_callback_called_on_invalid_ip_send_after() {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
 
-  assert(rec.calls.load(std::memory_order_relaxed) >= 1);
-  assert(rec.last_id.load(std::memory_order_relaxed) == id);
-  assert(rec.last_err.load(std::memory_order_relaxed) == EINVAL);
+  CHECK(rec.calls.load(std::memory_order_relaxed) >= 1);
+  CHECK(rec.last_id.load(std::memory_order_relaxed) == id);
+  CHECK(rec.last_err.load(std::memory_order_relaxed) == EINVAL);
 }
 
-/**
- * Periodic failure should keep invoking the callback until cancel().
- * After cancel(), callback count must stop increasing.
- */
 static void test_error_callback_periodic_invalid_ip_and_cancel_stops() {
   udp_sender::UdpSender sender;
   ErrRec rec{};
@@ -518,15 +490,15 @@ static void test_error_callback_periodic_invalid_ip_and_cancel_stops() {
   }
 
   const int calls_before_cancel = rec.calls.load(std::memory_order_relaxed);
-  assert(calls_before_cancel >= 2);
-  assert(rec.last_id.load(std::memory_order_relaxed) == id);
-  assert(rec.last_err.load(std::memory_order_relaxed) == EINVAL);
+  CHECK(calls_before_cancel >= 2);
+  CHECK(rec.last_id.load(std::memory_order_relaxed) == id);
+  CHECK(rec.last_err.load(std::memory_order_relaxed) == EINVAL);
 
-  assert(sender.cancel(id));
+  CHECK(sender.cancel(id));
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1600));
   const int calls_after = rec.calls.load(std::memory_order_relaxed);
-  assert(calls_after == calls_before_cancel);
+  CHECK(calls_after == calls_before_cancel);
 }
 
 int main() {
