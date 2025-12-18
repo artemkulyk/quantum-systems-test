@@ -10,19 +10,20 @@ using namespace std::chrono_literals;
 void StartThread(
     std::thread& thread,
     std::atomic<bool>& running,
-    const std::function<bool(void)>& Process,
+    std::function<bool(void)> Process, // Pass by value to avoid dangling reference to a temporary std::function
     const std::chrono::seconds timeout)
 {
     thread = std::thread(
-        [&] ()
+        // Move Process into the thread capture so the callable's lifetime is owned by the thread
+        // Use steady_clock for monotonic timeout measurement
+        [&running, timeout, Process = std::move(Process)] () mutable
         {
-            auto start = std::chrono::high_resolution_clock::now();
-            while(running)
+            const auto start = std::chrono::steady_clock::now();
+            while (running)
             {
-                bool aborted = Process();
+                const bool aborted = Process();
 
-                auto end = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+                const auto duration = std::chrono::steady_clock::now() - start;
                 if (aborted || duration > timeout)
                 {
                     running = false;
@@ -38,11 +39,11 @@ int main(int argc, char **argv)
     std::thread my_thread1, my_thread2;
     int loop_counter1 = 0, loop_counter2 = 0;
 
-    // start actions in seprate threads and wait of them
+    // start actions in separate threads and wait of them
 
     StartThread(
         my_thread1,
-        my_running, 
+        my_running,
         [&]()
         {
             // "some actions" simulated with waiting
@@ -54,10 +55,10 @@ int main(int argc, char **argv)
 
     StartThread(
         my_thread2,
-        my_running, 
+        my_running,
         [&]()
         {
-            // "some actions" simulated with waiting 
+            // "some actions" simulated with waiting
             if (loop_counter2 < 5)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -72,6 +73,6 @@ int main(int argc, char **argv)
     my_thread1.join();
     my_thread2.join();
 
-    // print execlution loop counters
+    // print execution loop counters
     std::cout << "C1: " << loop_counter1 << " C2: " << loop_counter2 << std::endl;
 }

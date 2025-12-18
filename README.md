@@ -1,8 +1,21 @@
 # quantum-systems-test
 Quantum Systems remote case study
 
-## 1. cpp task
-TODO
+## 1. cpp task. Thread runner with cooperative stop and timeout
+
+The original C++ implementation had several issues related to threading and lifetime management.
+
+First, the worker function was passed as `const std::function<bool()>&` and captured by reference inside the thread lambda. When a lambda was passed at the call site, it was implicitly converted into a temporary `std::function`. That temporary was destroyed when `StartThread` returned, while the worker thread continued to use it, resulting in undefined behavior.
+
+Second, the timeout logic relied on `std::chrono::high_resolution_clock`. This clock is not guaranteed to be monotonic and may jump backwards, which makes it unsuitable for measuring elapsed time.
+
+The corrected version makes the following changes:
+
+- The worker callable is passed by value as `std::function<bool()>` and moved into the thread’s capture list. This ensures the thread owns the callable and its lifetime is guaranteed for the entire execution of the thread.
+
+- Timeout measurement is performed using `std::chrono::steady_clock`, which is monotonic and safe for elapsed-time calculations.
+
+- The thread lambda explicitly captures only the required variables, improving clarity and preventing accidental reference captures.
 
 ## 2. python task. Matrix Rotation Fix
 
