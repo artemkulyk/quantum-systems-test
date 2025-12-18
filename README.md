@@ -1,5 +1,7 @@
-# quantum-systems-test
+# Quantum Systems Test
 Quantum Systems remote case study
+
+## 0. linux case. Files received from Quantum Systems
 
 ## 1. cpp task. Thread runner with cooperative stop and timeout
 
