@@ -51,26 +51,3 @@ Design highlights:
 - `send_now` reports errors synchronously via `bool` return and optional `out_errno`.
 
 Tests: [![cpp_class](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/cpp_class.yaml/badge.svg)](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/cpp_class.yaml)
-
-P.S.
-
-This task could be structured by separating **scheduling** and **UDP sending**.
-
-One part would handle timing only: delayed and periodic execution, cancellation, and worker thread management. It would execute generic callbacks and know nothing about networking.
-
-Another part would handle UDP I/O only: socket lifetime, address parsing, non-blocking send, and error reporting.
-
-Scheduled tasks would invoke the sender instead of sending directly.
-
-Pros:
-- Clear separation of responsibilities.
-- Easier unit testing of timing and I/O in isolation.
-- Reusable scheduler for non-network tasks.
-- Cleaner error boundaries.
-
-Cons:
-- More components and wiring.
-- Slight increase in complexity and indirection.
-- Overkill for small or tightly scoped code.
-
-The current design is simpler; the split design scales better.
