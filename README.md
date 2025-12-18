@@ -14,5 +14,7 @@ For a given layer, four corresponding elements are rotated at a time: top, right
 
 This method rotates the matrix 90 degrees clockwise, works entirely in place, preserves all values during rotation, and runs in $O(n^2)$ time with constant extra space.
 
+Tests: [![python_task](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/python_task.yaml/badge.svg)](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/python_task.yaml)
+
 ## 3. cpp class design and implementation
 TODO
