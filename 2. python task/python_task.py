@@ -1,9 +1,25 @@
+# Assumptions:
+# - matrix is a non-empty square matrix (n x n)
+# - all rows have equal length n
+# - rotation is performed in place
+# - rotates the matrix 90 degrees clockwise
 def rotate_in_place(matrix):
     n = len(matrix)
-    for r in range(n):
-        for c in range(n):
-            matrix[r][c] = matrix[n-c-1][r]
+    last = n - 1
 
+    # process the matrix layer by layer (from outer to inner)
+    for i in range(n // 2):
+        top = i
+        bottom = last - i
+        for j in range(i, bottom):
+            left = j
+            right = last - j
+
+            temp                   = matrix[top   ][left  ]
+            matrix[top   ][left  ] = matrix[right ][top   ]
+            matrix[right ][top   ] = matrix[bottom][right ]
+            matrix[bottom][right ] = matrix[left  ][bottom]
+            matrix[left  ][bottom] = temp
 
 MATRIX1 = [
     [ 1,  2,  3,  4],
