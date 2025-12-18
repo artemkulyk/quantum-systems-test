@@ -17,6 +17,8 @@ The corrected version makes the following changes:
 
 - The thread lambda explicitly captures only the required variables, improving clarity and preventing accidental reference captures.
 
+Tests: [![cpp_task](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/cpp_task.yaml/badge.svg)](https://github.com/artemkulyk/quantum-systems-test/actions/workflows/cpp_task.yaml)
+
 ## 2. python task. Matrix Rotation Fix
 
 The original implementation attempted to rotate the matrix by directly reassigning values while iterating over all rows and columns. This approach failed because elements were overwritten before their original values were used elsewhere, leading to incorrect results.

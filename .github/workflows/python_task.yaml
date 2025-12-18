@@ -2,7 +2,14 @@ name: python_task
 
 on:
   push:
+    paths:
+      - "2. python task/python_task.py"
+      - ".github/workflows/python_task.yaml"
   pull_request:
+    paths:
+      - "2. python task/python_task.py"
+      - ".github/workflows/python_task.yaml"
+  workflow_dispatch:
 
 jobs:
   run:

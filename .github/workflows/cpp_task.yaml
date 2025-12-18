@@ -1,0 +1,45 @@
+name: cpp_task
+
+on:
+  push:
+    paths:
+      - "1. cpp task/cpp_task.cpp"
+      - ".github/workflows/cpp_task.yaml"
+  pull_request:
+    paths:
+      - "1. cpp task/cpp_task.cpp"
+      - ".github/workflows/cpp_task.yaml"
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (C++17)
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic \
+              "1. cpp task/cpp_task.cpp" -pthread -o cpp_task
+
+      - name: Run
+        run: ./cpp_task
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build + Run (ASan+UBSan)
+        run: |
+          g++ -std=c++17 -O1 -g -Wall -Wextra -Wpedantic \
+              -fsanitize=address,undefined -fno-omit-frame-pointer \
+              "1. cpp task/cpp_task.cpp" -pthread -o cpp_task_asan
+          ./cpp_task_asan
+
+      - name: Build + Run (TSan)
+        run: |
+          g++ -std=c++17 -O1 -g -Wall -Wextra -Wpedantic \
+              -fsanitize=thread -fno-omit-frame-pointer \
+              "1. cpp task/cpp_task.cpp" -pthread -o cpp_task_tsan
+          ./cpp_task_tsan
