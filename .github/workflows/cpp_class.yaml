@@ -9,6 +9,7 @@ on:
     paths:
       - "3. cpp class/**"
       - ".github/workflows/cpp_class.yaml"
+  workflow_dispatch:
 
 concurrency:
   group: cpp-class-${{ github.ref }}
